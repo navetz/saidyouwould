@@ -55,7 +55,8 @@ class OylRecipientPageController extends Controller
     private function challengeData(OylChallenge $challenge): array
     {
         return [
-            'sender_name' => $challenge->sender_name,
+            'sender_name' => $challenge->publicSenderName(),
+            'anonymous' => (bool) $challenge->anonymous,
             'recipient_name' => $challenge->recipient_name,
             'mode' => $challenge->mode,
             'notify_recipient' => (bool) $challenge->notify_recipient,

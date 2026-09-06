@@ -3,7 +3,7 @@
 <body style="margin:0;background:#f3efe7;color:#1f2924;font-family:Arial,Helvetica,sans-serif;line-height:1.6">
 <div style="max-width:620px;margin:0 auto;padding:48px 24px">
     <p style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#6d756f;margin:0">Said You Would</p>
-    <h1 style="font-family:Georgia,serif;font-size:38px;line-height:1.12;margin:16px 0;font-weight:400">{{ $challenge->sender_name ?: 'Someone who knows you' }} put five dollars on your word.</h1>
+    <h1 style="font-family:Georgia,serif;font-size:38px;line-height:1.12;margin:16px 0;font-weight:400">{{ $challenge->publicSenderName() ?: 'Someone who knows you' }} put five dollars on your word.</h1>
     <p style="font-size:18px;margin:0 0 8px">You said this mattered. There is a sealed video waiting for you, recorded today and locked until the date below.</p>
     <div style="background:#fffdf8;border:1px solid #d9d4ca;border-radius:14px;padding:26px;margin:28px 0">
         <p style="font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:#767d78;margin:0 0 6px">The promise</p>

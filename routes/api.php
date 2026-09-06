@@ -22,3 +22,8 @@ Route::prefix('/recipient/{token}')->middleware('throttle:20,1')->group(function
         ->middleware('signed')
         ->name('api.oyl.recipient.video');
 });
+
+Route::get('/public/{slug}/video', [\App\Http\Controllers\OylBoardController::class, 'video'])
+    ->where('slug', '[a-z0-9]{6,16}')
+    ->middleware('throttle:60,1')
+    ->name('api.oyl.public.video');

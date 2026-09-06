@@ -18,7 +18,10 @@ const error = ref('');
 const saved = ref(false);
 const formattedDate = computed(() => new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeZone: 'UTC' })
     .format(new Date(`${props.challenge.delivery_date}T12:00:00Z`)));
-const sender = computed(() => props.challenge.sender_name || 'Someone who believes in you');
+const sender = computed(() => {
+    if (props.challenge.anonymous) return 'Someone';
+    return props.challenge.sender_name || 'Someone who believes in you';
+});
 const isSelf = computed(() => props.challenge.mode === 'self');
 const wasSilent = computed(() => !isSelf.value && !props.challenge.notify_recipient);
 
@@ -68,7 +71,7 @@ async function saveResponse() {
             <div class="recipient-intro">
                 <p class="eyebrow">A message is waiting for the future</p>
                 <h1>{{ sender }}<br><em>put $5 on your word.</em></h1>
-                <p>They recorded a private video for you and paid to have it sealed. You cannot watch it yet. That's the point.</p>
+                <p>They recorded a private video for you and paid to have it sealed. You cannot watch it yet. That's the point.<template v-if="challenge.anonymous"> And no, we won't say who. That's their call.</template></p>
             </div>
             <article class="promise-card">
                 <span class="card-label">The promise</span>

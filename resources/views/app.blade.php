@@ -8,6 +8,10 @@
         <meta property="og:title" content="Said You Would">
         <meta property="og:description" content="Put five dollars on your word. A sealed video, delivered one year later.">
         <meta property="og:type" content="website">
+        <meta property="og:url" content="{{ config('app.url') }}">
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        <link rel="icon" href="/favicon.ico" sizes="48x48">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">

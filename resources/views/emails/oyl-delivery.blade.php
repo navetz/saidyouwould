@@ -7,9 +7,9 @@
     @if($challenge->mode === 'self')
         <p style="font-size:19px;margin:0 0 8px">One year ago today, you recorded a video for this exact moment. You sealed it, you paid for it, and you have not seen it since.</p>
     @elseif($challenge->notify_recipient)
-        <p style="font-size:19px;margin:0 0 8px">One year ago, {{ $challenge->sender_name ?: 'someone who knows you' }} recorded a video about a promise you made. Today it unlocks.</p>
+        <p style="font-size:19px;margin:0 0 8px">One year ago, {{ $challenge->publicSenderName() ?: 'someone who knows you' }} recorded a video about a promise you made. Today it unlocks.</p>
     @else
-        <p style="font-size:19px;margin:0 0 8px">One year ago, {{ $challenge->sender_name ?: 'someone who knows you' }} recorded a video about something you said, and told you nothing. They paid to have it delivered today.</p>
+        <p style="font-size:19px;margin:0 0 8px">One year ago, {{ $challenge->publicSenderName() ?: 'someone who knows you' }} recorded a video about something you said, and told you nothing. They paid to have it delivered today.</p>
     @endif
     @if($challenge->goal_title)
         <h2 style="font-family:Georgia,serif;font-size:28px;color:#f4b35d;font-weight:400;margin:26px 0">&ldquo;{{ $challenge->goal_title }}&rdquo;</h2>

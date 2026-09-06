@@ -19,7 +19,8 @@ class ImmediateChallengeNotice extends Mailable
 
     public function envelope(): Envelope
     {
-        $sender = $this->challenge->sender_name ?: $this->challenge->sender_email;
+        $sender = $this->challenge->publicSenderName()
+            ?: ($this->challenge->anonymous ? 'Someone' : $this->challenge->sender_email);
 
         return new Envelope(subject: $sender.' put five dollars on your word');
     }

@@ -1,5 +1,5 @@
 <script setup>
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const props = defineProps({
@@ -11,6 +11,7 @@ const props = defineProps({
 const form = ref({
     mode: 'friend',
     notify_recipient: false,
+    anonymous: false,
     recipient_email: '',
     recipient_name: '',
     goal_title: '',
@@ -20,11 +21,13 @@ const form = ref({
     sender_email: '',
     sender_name: '',
     terms_accepted: false,
+    is_public: true,
+    source: '',
     website: '',
 });
+const moreOptions = ref(false);
 
 const steps = [
-    { key: 'promise', label: 'The promise' },
     { key: 'video', label: 'The video' },
     { key: 'delivery', label: 'The delivery' },
     { key: 'seal', label: 'The seal' },
@@ -84,6 +87,15 @@ const recapFor = computed(() => {
         : form.value.recipient_email;
 });
 
+const recapFrom = computed(() => {
+    if (isSelf.value || !form.value.anonymous) return null;
+    return 'Anonymous. We never tell them it was you.';
+});
+
+const recapBoard = computed(() => {
+    if (!form.value.is_public) return 'Off the board. Only the receipt and the delivery email know it exists.';
+    return 'The promise and the date show on the public board today. The video plays there the day it lands.';
+});
 const recapMeanwhile = computed(() => {
     if (isSelf.value) return 'Nothing. No previews, no reminders. It just arrives.';
     if (form.value.notify_recipient) return 'They get put on notice by email today. The video stays sealed.';
@@ -118,17 +130,18 @@ const stepForField = {
     mode: 1,
     goal_title: 1,
     goal_description: 1,
-    video: 2,
-    video_storage_key: 2,
-    video_upload_token: 2,
-    notify_recipient: 3,
-    recipient_email: 3,
-    recipient_name: 3,
-    sender_email: 3,
-    sender_name: 3,
-    delivery_date: 3,
-    written_terms: 3,
-    terms_accepted: 4,
+    video: 1,
+    video_storage_key: 1,
+    video_upload_token: 1,
+    notify_recipient: 2,
+    anonymous: 2,
+    recipient_email: 2,
+    recipient_name: 2,
+    sender_email: 2,
+    sender_name: 2,
+    delivery_date: 2,
+    written_terms: 2,
+    terms_accepted: 3,
 };
 
 function chooseMode(mode) {
@@ -147,11 +160,11 @@ function goTo(target) {
 function advance() {
     stepError.value = '';
 
-    if (step.value === 2 && !videoFile.value) {
+    if (step.value === 1 && !videoFile.value) {
         stepError.value = 'Record or upload the video first. It is the whole point.';
         return;
     }
-    if (step.value === 3) {
+    if (step.value === 2) {
         if (!isSelf.value && !form.value.recipient_email.trim()) { stepError.value = 'Add their email so the video knows where to land.'; return; }
         if (!form.value.sender_email.trim()) { stepError.value = isSelf.value ? 'Add your email. That is where it lands in a year.' : 'Add your email for the sealed receipt.'; return; }
         if (!form.value.delivery_date) { stepError.value = 'Pick the day it lands.'; return; }
@@ -165,7 +178,7 @@ function advance() {
 function jumpToFirstError(errorBag) {
     const fields = Object.keys(errorBag);
     if (!fields.length) return;
-    const target = Math.min(...fields.map((field) => stepForField[field] ?? 4));
+    const target = Math.min(...fields.map((field) => stepForField[field] ?? 3));
     step.value = target;
     nextTick(() => document.querySelector('#start')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }
@@ -214,7 +227,8 @@ async function startRecording() {
             if (event.data.size) chunks.push(event.data);
         };
         mediaRecorder.onstop = () => {
-            const type = mediaRecorder.mimeType || 'video/webm';
+            // MediaRecorder reports "video/webm;codecs=vp9,opus"; the upload API wants the bare type.
+            const type = (mediaRecorder.mimeType || 'video/webm').split(';')[0].trim();
             const extension = type.includes('mp4') ? 'mp4' : 'webm';
             setVideo(new File(chunks, `one-year-later.${extension}`, { type }));
             stopStream();
@@ -274,8 +288,9 @@ async function submit() {
         });
         const upload = await uploadResponse.json();
         if (!uploadResponse.ok) {
-            if (uploadResponse.status === 422) { errors.value = upload.errors || {}; jumpToFirstError(errors.value); }
-            else generalError.value = upload.message || 'The video upload could not start.';
+            const first = Object.values(upload.errors || {}).flat()[0];
+            generalError.value = first || upload.message || 'The video upload could not start.';
+            errors.value.video = first ? [first] : null;
             return;
         }
 
@@ -307,6 +322,7 @@ async function submit() {
         sessionStorage.setItem('oyl-pending', JSON.stringify({
             checkout_url: data.checkout_url,
             goal_title: data.challenge.goal_title,
+            public_url: data.challenge.public_url,
             saved_at: Date.now(),
         }));
         window.location.href = data.checkout_url;
@@ -320,6 +336,13 @@ async function submit() {
 
 onMounted(() => {
     const params = new URLSearchParams(window.location.search);
+    const src = (params.get('src') || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 60);
+    try {
+        if (src) sessionStorage.setItem('oyl-src', src);
+        form.value.source = src || sessionStorage.getItem('oyl-src') || '';
+    } catch {
+        form.value.source = src;
+    }
     if (params.get('checkout') !== 'cancelled') return;
     try {
         const pending = JSON.parse(sessionStorage.getItem('oyl-pending'));
@@ -343,7 +366,10 @@ onBeforeUnmount(() => {
     <main class="site-shell">
         <header class="topbar">
             <a class="wordmark" href="/">Said You Would<span class="wordmark-dot">.</span></a>
-            <span class="topbar-tag">{{ price }} &middot; one video &middot; one year</span>
+            <nav class="topnav">
+                <span class="topbar-tag">{{ price }} &middot; one video &middot; one year</span>
+                <Link href="/board" class="topnav-link">The board</Link>
+            </nav>
         </header>
 
         <div v-if="resumeCheckout" class="resume-banner">
@@ -370,7 +396,8 @@ onBeforeUnmount(() => {
                 <li><b>2</b><strong>Seal it for {{ price }}</strong><span>No edits, no previews, no take-backs.</span></li>
                 <li><b>3</b><strong>One year later</strong><span>{{ hero.how3 }}</span></li>
             </ol>
-            <a class="text-link" href="#start">Start yours <span>&darr;</span></a>
+            <a class="button button-primary hero-cta" href="#start"><span class="button-dot"></span> Record yours</a>
+            <Link href="/board" class="text-link hero-board-link">See who else said they would <span>&rarr;</span></Link>
         </section>
 
         <section id="start" class="wizard">
@@ -390,42 +417,15 @@ onBeforeUnmount(() => {
             </ol>
 
             <Transition name="step" mode="out-in">
-                <!-- Step 1: the promise -->
-                <div v-if="step === 1" key="promise" class="step-panel">
-                    <p class="eyebrow">Step 1 of 4 &middot; The promise</p>
-                    <h2 v-if="isSelf">What are you<br>promising?</h2>
-                    <h2 v-else>What did they say<br>they'd do?</h2>
+                <!-- Step 1: the video -->
+                <div v-if="step === 1" key="video" class="step-panel">
+                    <p class="eyebrow">Step 1 of 3 &middot; The video</p>
+                    <h2>Say it<br>on camera.</h2>
                     <div class="hero-toggle mode-mini" role="group" aria-label="Who is this for?">
                         <button type="button" :class="{ active: !isSelf }" @click="chooseMode('friend')">For a friend</button>
                         <button type="button" :class="{ active: isSelf }" @click="chooseMode('self')">For future me</button>
                         <span class="hero-toggle-thumb" :class="{ right: isSelf }" aria-hidden="true"></span>
                     </div>
-
-                    <div class="fields-grid step-fields">
-                        <label class="field field-wide">
-                            <span>The promise, in one line <i>optional</i></span>
-                            <input v-model="form.goal_title" type="text" maxlength="160" :placeholder="isSelf ? 'I will have launched the app and quit my job' : 'Maya says she\u2019ll be jacked by next June'">
-                            <small>Skip everything here if you want. The video does the talking.</small>
-                            <small v-if="firstError('goal_title')" class="field-error">{{ firstError('goal_title') }}</small>
-                        </label>
-                        <label class="field field-wide">
-                            <span>What does &ldquo;done&rdquo; look like? <i>optional</i></span>
-                            <textarea v-model="form.goal_description" rows="3" maxlength="3000" placeholder="If you want it airtight: be specific enough that a year from now the answer is a clean yes or no."></textarea>
-                            <small v-if="firstError('goal_description')" class="field-error">{{ firstError('goal_description') }}</small>
-                        </label>
-                    </div>
-
-                    <div class="step-nav">
-                        <span></span>
-                        <button type="button" class="button button-primary step-continue" @click="advance">Lock in the promise <b>&rarr;</b></button>
-                    </div>
-                    <p v-if="stepError" class="field-error step-error">{{ stepError }}</p>
-                </div>
-
-                <!-- Step 2: the video -->
-                <div v-else-if="step === 2" key="video" class="step-panel">
-                    <p class="eyebrow">Step 2 of 4 &middot; The video</p>
-                    <h2>Say it<br>on camera.</h2>
                     <p class="step-copy">{{ isSelf ? 'Talk straight to the person watching this in one year. Tell them what will be true by then.' : 'Repeat what they said, word for word if you can. Add today\u2019s date. This is what they\u2019ll watch one year from now.' }}</p>
 
                     <div class="video-card" :class="{ 'has-video': videoPreview || isRecording }">
@@ -452,16 +452,25 @@ onBeforeUnmount(() => {
                     </div>
                     <p v-if="firstError('video')" class="field-error">{{ firstError('video') }}</p>
 
+                    <div class="fields-grid step-fields">
+                        <label class="field field-wide">
+                            <span>The promise, in one line <i>optional</i></span>
+                            <input v-model="form.goal_title" type="text" maxlength="160" :placeholder="isSelf ? 'I will have launched the app and quit my job' : 'Maya says she’ll be jacked by next June'">
+                            <small>Skip this if you want. The video does the talking.</small>
+                            <small v-if="firstError('goal_title')" class="field-error">{{ firstError('goal_title') }}</small>
+                        </label>
+                    </div>
+
                     <div class="step-nav">
-                        <button type="button" class="back-button" @click="goTo(1)">&larr; Back</button>
+                        <span></span>
                         <button type="button" class="button button-primary step-continue" @click="advance">Use this video <b>&rarr;</b></button>
                     </div>
                     <p v-if="stepError" class="field-error step-error">{{ stepError }}</p>
                 </div>
 
-                <!-- Step 3: the delivery -->
-                <div v-else-if="step === 3" key="delivery" class="step-panel">
-                    <p class="eyebrow">Step 3 of 4 &middot; The delivery</p>
+                <!-- Step 2: the delivery -->
+                <div v-else-if="step === 2" key="delivery" class="step-panel">
+                    <p class="eyebrow">Step 2 of 3 &middot; The delivery</p>
                     <h2 v-if="isSelf">Where does<br>it land?</h2>
                     <h2 v-else>Do they find out today,<br>or in a year?</h2>
 
@@ -499,6 +508,7 @@ onBeforeUnmount(() => {
                         <label class="field">
                             <span>Your name <i>optional</i></span>
                             <input v-model="form.sender_name" type="text" maxlength="100" placeholder="Alex">
+                            <small v-if="!isSelf && form.anonymous">Only used on your receipt. They never see it.</small>
                             <small v-if="firstError('sender_name')" class="field-error">{{ firstError('sender_name') }}</small>
                         </label>
                         <label class="field">
@@ -510,6 +520,18 @@ onBeforeUnmount(() => {
                             <span class="sun-mark">&#9788;</span>
                             <p><strong>{{ formattedDeliveryDate }}</strong><br><template v-if="daysAway">{{ daysAway }} days from now, it surfaces.</template></p>
                         </div>
+                    </div>
+
+                    <button type="button" class="more-toggle" :aria-expanded="moreOptions" @click="moreOptions = !moreOptions">
+                        <b>{{ moreOptions ? '&minus;' : '+' }}</b>
+                        <span>{{ isSelf ? 'Add an incentive' : 'Stay anonymous, or add an incentive' }} <i>optional</i></span>
+                    </button>
+                    <div v-show="moreOptions" class="fields-grid more-fields">
+                        <label v-if="!isSelf" class="terms-check anonymous-check field-wide">
+                            <input v-model="form.anonymous" type="checkbox">
+                            <span class="custom-check">&#10003;</span>
+                            <span>Stay anonymous. Your name and email are never shown to them, not in the notice, not with the video, not on the board. What you reveal on camera is up to you.</span>
+                        </label>
                         <label class="field field-wide">
                             <span>The incentive <i>optional</i></span>
                             <textarea v-model="form.written_terms" rows="3" maxlength="3000" :placeholder="isSelf ? 'If I pull this off, I\u2019m buying myself the good guitar.' : 'If Maya pulls this off, I owe her a steak dinner.'"></textarea>
@@ -519,24 +541,39 @@ onBeforeUnmount(() => {
                     </div>
 
                     <div class="step-nav">
-                        <button type="button" class="back-button" @click="goTo(2)">&larr; Back</button>
+                        <button type="button" class="back-button" @click="goTo(1)">&larr; Back</button>
                         <button type="button" class="button button-primary step-continue" @click="advance">Review the seal <b>&rarr;</b></button>
                     </div>
                     <p v-if="stepError" class="field-error step-error">{{ stepError }}</p>
                 </div>
 
-                <!-- Step 4: the seal -->
+                <!-- Step 3: the seal -->
                 <div v-else key="seal" class="step-panel step-panel-seal">
-                    <p class="eyebrow">Step 4 of 4 &middot; The seal</p>
+                    <p class="eyebrow">Step 3 of 3 &middot; The seal</p>
                     <h2>Five dollars says<br>you mean it.</h2>
                     <p class="step-copy">Every Said You Would is paid. No free messages, no drafts. The {{ price }} isn't for the video. It's the line between <em>&ldquo;yeah, yeah&rdquo;</em> and <em>on the record.</em></p>
+
+                    <div class="public-toggle" :class="{ on: form.is_public }">
+                        <label class="terms-check public-check">
+                            <input v-model="form.is_public" type="checkbox">
+                            <span class="custom-check">&#10003;</span>
+                            <span><strong>Put it on the board.</strong> The promise line, {{ form.anonymous ? '\u201cSomeone\u201d' : (form.sender_name.trim() || 'your name') }}, and the date show on the <Link href="/board">public board</Link> today. The video stays sealed until it lands, then plays there for anyone to watch.</span>
+                        </label>
+                        <label v-if="form.is_public && !form.goal_title.trim()" class="field field-wide public-title">
+                            <span>One line for the board</span>
+                            <input v-model="form.goal_title" type="text" maxlength="160" :placeholder="isSelf ? 'I will have run a marathon' : 'Maya says she\u2019ll be jacked by next June'">
+                            <small>Leave it blank and the board shows &ldquo;It&rsquo;s all in the video.&rdquo;</small>
+                        </label>
+                    </div>
 
                     <dl class="recap-card">
                         <div><dt>The promise</dt><dd>{{ form.goal_title.trim() || 'It\u2019s all in the video.' }}</dd></div>
                         <div><dt>Lands</dt><dd>{{ formattedDeliveryDate }}<template v-if="daysAway"> &middot; {{ daysAway }} days from now</template></dd></div>
                         <div><dt>For</dt><dd>{{ recapFor }}</dd></div>
+                        <div v-if="recapFrom"><dt>From</dt><dd>{{ recapFrom }}</dd></div>
                         <div v-if="form.written_terms.trim()"><dt>The incentive</dt><dd>{{ form.written_terms }}</dd></div>
                         <div><dt>Between now and then</dt><dd>{{ recapMeanwhile }}</dd></div>
+                        <div><dt>The board</dt><dd>{{ recapBoard }}</dd></div>
                     </dl>
 
                     <label class="terms-check">
@@ -549,7 +586,7 @@ onBeforeUnmount(() => {
                     <p v-if="generalError" class="submit-error">{{ generalError }}</p>
 
                     <div class="step-nav step-nav-seal">
-                        <button type="button" class="back-button" @click="goTo(3)">&larr; Back</button>
+                        <button type="button" class="back-button" @click="goTo(2)">&larr; Back</button>
                         <button class="button commit-button" type="button" :disabled="submitting" @click="submit">
                             <span>{{ submitting ? submitStage : `Seal it for ${price}` }}</span>
                             <b>&rarr;</b>
@@ -566,7 +603,7 @@ onBeforeUnmount(() => {
                 <a class="wordmark" href="/">Said You Would<span class="wordmark-dot">.</span></a>
                 <p>You said you would. One year later, we check.</p>
             </div>
-            <a class="huddle-promo" href="https://habithuddle.com" target="_blank" rel="noopener">
+            <a class="huddle-promo" href="https://habithuddle.com/?src=syw-home" target="_blank" rel="noopener">
                 <span class="huddle-kicker">From the maker of</span>
                 <strong>Habit Huddle</strong>
                 <span>A year is built one day at a time. Build the habit with friends watching.</span>

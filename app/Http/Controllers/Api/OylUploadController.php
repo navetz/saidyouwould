@@ -13,6 +13,8 @@ class OylUploadController extends Controller
     public function store(Request $request, VideoStorage $videos): JsonResponse
     {
         $maximumBytes = config('one-year-later.max_video_size_kb') * 1024;
+        // Browsers send "video/webm;codecs=vp9,opus" for recordings; validate the bare type.
+        $request->merge(['content_type' => trim(strtolower(explode(';', (string) $request->input('content_type'))[0]))]);
         $validated = $request->validate([
             'filename' => ['required', 'string', 'max:255'],
             'content_type' => ['required', Rule::in(config('one-year-later.allowed_video_types'))],

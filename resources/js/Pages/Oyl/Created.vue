@@ -1,6 +1,6 @@
 <script setup>
 import { Head } from '@inertiajs/vue3';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 const props = defineProps({
     state: String,
@@ -27,6 +27,20 @@ const silenceLine = computed(() => {
     return 'They have no idea. Don\u2019t bring it up. Let the year do the work.';
 });
 
+const copied = ref(false);
+async function share() {
+    const url = props.challenge.public_url;
+    const text = props.challenge.goal_title ? `I said I would: ${props.challenge.goal_title}` : 'I put $5 on my word.';
+    if (navigator.share) {
+        try { await navigator.share({ title: 'Said You Would', text, url }); return; } catch { /* dismissed */ }
+    }
+    try {
+        await navigator.clipboard.writeText(url);
+        copied.value = true;
+        setTimeout(() => { copied.value = false; }, 2000);
+    } catch { /* clipboard blocked */ }
+}
+
 onMounted(() => {
     if (props.state === 'sealed') sessionStorage.removeItem('oyl-pending');
 });
@@ -46,8 +60,13 @@ onMounted(() => {
                 <div><dt>The stake</dt><dd>{{ amount }}, paid</dd></div>
                 <div><dt>Arrives</dt><dd>{{ date }}</dd></div>
                 <div><dt>Between now and then</dt><dd>{{ silenceLine }}</dd></div>
+                <div v-if="challenge.public_url"><dt>The board</dt><dd><a :href="challenge.public_url" class="public-link">{{ challenge.public_url.replace(/^https?:\/\//, '') }}</a><br><span class="subdued">The video plays there the day it lands.</span></dd></div>
             </dl>
-            <a class="huddle-card" href="https://habithuddle.com" target="_blank" rel="noopener">
+            <div v-if="challenge.public_url" class="public-actions public-actions-dark">
+                <button type="button" class="button button-light" @click="share">{{ copied ? 'Link copied' : 'Share your seal' }}</button>
+                <a class="button button-light" href="/board">See the board</a>
+            </div>
+            <a class="huddle-card" href="https://habithuddle.com/?src=syw-sealed" target="_blank" rel="noopener">
                 <span class="huddle-kicker">One more thing</span>
                 <strong>A year is built one day at a time.</strong>
                 <p>{{ isSelf ? 'The version of you opening that video is made of 365 ordinary days. Stack them with friends watching on Habit Huddle, from the same maker. Free.' : 'Want to be on the right side of your own next bet? Build the daily habit with friends watching on Habit Huddle, from the same maker. Free.' }}</p>

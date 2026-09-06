@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\OylBoardController;
 use App\Http\Controllers\OylCreatedPageController;
 use App\Http\Controllers\OylRecipientPageController;
 use Illuminate\Support\Facades\Route;
@@ -13,6 +14,12 @@ Route::get('/', fn () => Inertia::render('Oyl/CreateChallenge', [
 
 Route::get('/challenge-created', [OylCreatedPageController::class, 'show'])
     ->name('oyl.created');
+
+Route::get('/board', [OylBoardController::class, 'index'])->name('oyl.board');
+
+Route::get('/p/{slug}', [OylBoardController::class, 'show'])
+    ->where('slug', '[a-z0-9]{6,16}')
+    ->name('oyl.public');
 
 Route::get('/r/{token}/acknowledge', [OylRecipientPageController::class, 'acknowledge'])
     ->middleware('signed')

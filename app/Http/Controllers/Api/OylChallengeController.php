@@ -35,6 +35,10 @@ class OylChallengeController extends Controller
                 'recipient_email' => $isSelf ? $validated['sender_email'] : $validated['recipient_email'],
                 'recipient_name' => $isSelf ? ($validated['sender_name'] ?? null) : ($validated['recipient_name'] ?? null),
                 'notify_recipient' => $isSelf ? false : (bool) $validated['notify_recipient'],
+                'anonymous' => $isSelf ? false : (bool) ($validated['anonymous'] ?? false),
+                'is_public' => (bool) ($validated['is_public'] ?? false),
+                'public_slug' => strtolower(Str::random(10)),
+                'source' => isset($validated['source']) ? strtolower($validated['source']) : null,
                 'goal_title' => $validated['goal_title'] ?? null,
                 'goal_description' => $validated['goal_description'] ?? null,
                 'written_terms' => $validated['written_terms'] ?? null,
@@ -68,6 +72,7 @@ class OylChallengeController extends Controller
                 'goal_title' => $challenge->goal_title,
                 'mode' => $challenge->mode,
                 'delivery_date' => $challenge->delivery_date->toDateString(),
+                'public_url' => $challenge->is_public ? $challenge->publicUrl() : null,
             ],
         ], 201);
     }

@@ -142,6 +142,54 @@ class OneYearLaterTest extends TestCase
         Mail::assertSent(ChallengeSealedReceipt::class, fn ($mail) => $mail->hasTo('alex@example.com'));
     }
 
+    public function test_anonymous_challenges_never_reveal_the_sender_to_the_recipient(): void
+    {
+        $this->fakeVideoStorage();
+        $payments = $this->fakePayments();
+        Mail::fake();
+
+        $this->postJson('/api/challenges', $this->challengePayload([
+            'anonymous' => true,
+            'notify_recipient' => true,
+        ]))->assertCreated();
+
+        $challenge = OylChallenge::sole();
+        $this->assertTrue($challenge->anonymous);
+        $this->postWebhook($payments, $challenge)->assertOk();
+
+        $mailable = new ImmediateChallengeNotice($challenge->fresh(), 'https://example.com/ack');
+        $this->assertStringNotContainsString('Alex', $mailable->envelope()->subject);
+        $notice = $mailable->render();
+        $this->assertStringNotContainsString('Alex', $notice);
+        $this->assertStringContainsString('Someone who knows you', $notice);
+
+        $delivery = (new FutureChallengeDelivery($challenge->fresh(), 'https://example.com/watch'))->render();
+        $this->assertStringNotContainsString('Alex', $delivery);
+
+        [$anonymous, $token] = $this->challenge(['anonymous' => true]);
+        $this->get(app(ChallengeLinks::class)->acknowledgement($anonymous, $token))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('challenge.sender_name', null)
+                ->where('challenge.anonymous', true));
+    }
+
+    public function test_self_mode_is_never_anonymous(): void
+    {
+        $this->fakeVideoStorage();
+        $this->fakePayments();
+
+        $this->postJson('/api/challenges', $this->challengePayload([
+            'mode' => 'self',
+            'recipient_email' => null,
+            'recipient_name' => null,
+            'notify_recipient' => null,
+            'anonymous' => true,
+        ]))->assertCreated();
+
+        $this->assertFalse(OylChallenge::sole()->anonymous);
+    }
+
     public function test_success_page_verifies_payment_with_stripe_and_activates(): void
     {
         $this->fakeVideoStorage();

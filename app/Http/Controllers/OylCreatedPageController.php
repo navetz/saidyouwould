@@ -55,6 +55,7 @@ class OylCreatedPageController extends Controller
                 'recipient_name' => $challenge->recipient_name,
                 'delivery_date' => $challenge->delivery_date->toDateString(),
                 'amount_cents' => $challenge->amount_cents,
+                'public_url' => $challenge->is_public ? $challenge->publicUrl() : null,
             ],
         ]);
     }
